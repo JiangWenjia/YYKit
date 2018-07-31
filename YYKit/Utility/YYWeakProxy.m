@@ -23,7 +23,7 @@
     return [[YYWeakProxy alloc] initWithTarget:target];
 }
 
-- (id)forwardingTargetForSelector:(SEL)selector {
+- (id)forwardingTargetForSelector:(SEL)selector { //利用消息转发实现代理
     return _target;
 }
 
@@ -35,6 +35,8 @@
 - (NSMethodSignature *)methodSignatureForSelector:(SEL)selector {
     return [NSObject instanceMethodSignatureForSelector:@selector(init)];
 }
+
+//以下是让代理看起来像被代理的人
 
 - (BOOL)respondsToSelector:(SEL)aSelector {
     return [_target respondsToSelector:aSelector];

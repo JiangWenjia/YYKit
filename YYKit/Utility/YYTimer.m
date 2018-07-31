@@ -12,6 +12,7 @@
 #import "YYTimer.h"
 #import <pthread.h>
 
+//出现很多次了
 #define LOCK(...) dispatch_semaphore_wait(_lock, DISPATCH_TIME_FOREVER); \
 __VA_ARGS__; \
 dispatch_semaphore_signal(_lock);
@@ -21,7 +22,7 @@ dispatch_semaphore_signal(_lock);
     BOOL _valid;
     NSTimeInterval _timeInterval;
     BOOL _repeats;
-    __weak id _target;
+    __weak id _target; //注意是__weak
     SEL _selector;
     dispatch_source_t _source;
     dispatch_semaphore_t _lock;
@@ -56,7 +57,7 @@ dispatch_semaphore_signal(_lock);
     _source = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, dispatch_get_main_queue());
     dispatch_source_set_timer(_source, dispatch_time(DISPATCH_TIME_NOW, (start * NSEC_PER_SEC)), (interval * NSEC_PER_SEC), 0);
     dispatch_source_set_event_handler(_source, ^{[_self fire];});
-    dispatch_resume(_source);
+    dispatch_resume(_source); //直接启动
     return self;
 }
 
@@ -83,7 +84,7 @@ dispatch_semaphore_signal(_lock);
     } else {
         dispatch_semaphore_signal(_lock);
         [target performSelector:_selector withObject:self];
-        if (!_repeats) {
+        if (!_repeats) { //不是重复的直接销毁
             [self invalidate];
         }
     }

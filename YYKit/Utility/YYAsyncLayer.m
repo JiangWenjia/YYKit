@@ -33,6 +33,7 @@ static dispatch_queue_t YYAsyncLayerGetDisplayQueue() {
         queueCount = queueCount < 1 ? 1 : queueCount > MAX_QUEUE_COUNT ? MAX_QUEUE_COUNT : queueCount;
         if ([UIDevice currentDevice].systemVersion.floatValue >= 8.0) {
             for (NSUInteger i = 0; i < queueCount; i++) {
+                //qos 设置优先级
                 dispatch_queue_attr_t attr = dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_USER_INITIATED, 0);
                 queues[i] = dispatch_queue_create("com.ibireme.yykit.render", attr);
             }
@@ -43,6 +44,7 @@ static dispatch_queue_t YYAsyncLayerGetDisplayQueue() {
             }
         }
     });
+    //利用OSAtomicIncrement32 值增加然后取余 0.1.....queueCount 轮询取
     int32_t cur = OSAtomicIncrement32(&counter);
     if (cur < 0) cur = -cur;
     return queues[(cur) % queueCount];
@@ -50,11 +52,11 @@ static dispatch_queue_t YYAsyncLayerGetDisplayQueue() {
 #endif
 }
 
-static dispatch_queue_t YYAsyncLayerGetReleaseQueue() {
+static dispatch_queue_t YYAsyncLayerGetReleaseQueue() { //用于释放的队列
 #ifdef YYDispatchQueuePool_h
     return YYDispatchQueueGetForQOS(NSQualityOfServiceDefault);
 #else
-    return dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0);
+    return dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0);//全局并发队列
 #endif
 }
 
@@ -64,7 +66,7 @@ static dispatch_queue_t YYAsyncLayerGetReleaseQueue() {
 
 
 @implementation YYAsyncLayer {
-    YYSentinel *_sentinel;
+    YYSentinel *_sentinel; //哨兵对象
 }
 
 #pragma mark - Override
@@ -91,7 +93,7 @@ static dispatch_queue_t YYAsyncLayerGetReleaseQueue() {
 }
 
 - (void)dealloc {
-    [_sentinel increase];
+    [_sentinel increase]; //销毁的是，也使的哨兵增加，图层销毁了，就没必要继续绘制了
 }
 
 - (void)setNeedsDisplay {
@@ -107,9 +109,9 @@ static dispatch_queue_t YYAsyncLayerGetReleaseQueue() {
 #pragma mark - Private
 
 - (void)_displayAsync:(BOOL)async {
-    __strong id<YYAsyncLayerDelegate> delegate = (id)self.delegate;
-    YYAsyncLayerDisplayTask *task = [delegate newAsyncDisplayTask];
-    if (!task.display) {
+    __strong id<YYAsyncLayerDelegate> delegate = (id)self.delegate; // __strong
+    YYAsyncLayerDisplayTask *task = [delegate newAsyncDisplayTask]; //获取绘制任务
+    if (!task.display) { //没有绘制任务
         if (task.willDisplay) task.willDisplay(self);
         self.contents = nil;
         if (task.didDisplay) task.didDisplay(self, YES);
@@ -120,7 +122,7 @@ static dispatch_queue_t YYAsyncLayerGetReleaseQueue() {
         if (task.willDisplay) task.willDisplay(self);
         YYSentinel *sentinel = _sentinel;
         int32_t value = sentinel.value;
-        BOOL (^isCancelled)() = ^BOOL() {
+        BOOL (^isCancelled)(void) = ^BOOL() { //判断是否取消了绘制
             return value != sentinel.value;
         };
         CGSize size = self.bounds.size;
@@ -212,13 +214,14 @@ static dispatch_queue_t YYAsyncLayerGetReleaseQueue() {
         task.display(context, self.bounds.size, ^{return NO;});
         UIImage *image = UIGraphicsGetImageFromCurrentImageContext();
         UIGraphicsEndImageContext();
-        self.contents = (__bridge id)(image.CGImage);
+        self.contents = (__bridge id)(image.CGImage);//将绘制生成图片，设置为内容
         if (task.didDisplay) task.didDisplay(self, YES);
     }
 }
 
+//取消原来的绘制
 - (void)_cancelAsyncDisplay {
-    [_sentinel increase];
+    [_sentinel increase]; //哨兵加1，用来判断是否绘制是否被取消 OSAtomicIncrement32 比锁等方式更加高效，并且线程安全
 }
 
 @end

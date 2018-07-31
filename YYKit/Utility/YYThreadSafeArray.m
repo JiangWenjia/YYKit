@@ -13,6 +13,7 @@
 #import "NSArray+YYAdd.h"
 
 
+//使用信号量同步 ... __VA_ARGS__ 的使用
 #define INIT(...) self = super.init; \
 if (!self) return nil; \
 __VA_ARGS__; \
@@ -20,14 +21,14 @@ if (!_arr) return nil; \
 _lock = dispatch_semaphore_create(1); \
 return self;
 
-
+//... __VA_ARGS__ 的使用
 #define LOCK(...) dispatch_semaphore_wait(_lock, DISPATCH_TIME_FOREVER); \
 __VA_ARGS__; \
 dispatch_semaphore_signal(_lock);
 
 
 @implementation YYThreadSafeArray {
-    NSMutableArray *_arr;  //Subclass a class cluster...
+    NSMutableArray *_arr;  //Subclass a class cluster... 内部array
     dispatch_semaphore_t _lock;
 }
 

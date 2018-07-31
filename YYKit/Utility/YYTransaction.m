@@ -19,14 +19,15 @@
 
 static NSMutableSet *transactionSet = nil;
 
+//kCFRunLoopBeforeWaiting 和 kCFRunLoopExit 的时候回调
 static void YYRunLoopObserverCallBack(CFRunLoopObserverRef observer, CFRunLoopActivity activity, void *info) {
     if (transactionSet.count == 0) return;
     NSSet *currentSet = transactionSet;
-    transactionSet = [NSMutableSet new];
+    transactionSet = [NSMutableSet new]; //每次runloop回调，重新生成
     [currentSet enumerateObjectsUsingBlock:^(YYTransaction *transaction, BOOL *stop) {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Warc-performSelector-leaks"
-        [transaction.target performSelector:transaction.selector];
+        [transaction.target performSelector:transaction.selector]; //执行
 #pragma clang diagnostic pop
     }];
 }
@@ -62,13 +63,13 @@ static void YYTransactionSetup() {
 - (void)commit {
     if (!_target || !_selector) return;
     YYTransactionSetup();
-    [transactionSet addObject:self];
+    [transactionSet addObject:self]; //往set里面添加
 }
 
 - (NSUInteger)hash {
     long v1 = (long)((void *)_selector);
     long v2 = (long)_target;
-    return v1 ^ v2;
+    return v1 ^ v2; // 对象和方法异或 相同则视为一个 set 中的元素不重复 同 other.selector == _selector && other.target == _target
 }
 
 - (BOOL)isEqual:(id)object {

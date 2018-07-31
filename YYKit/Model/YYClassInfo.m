@@ -154,21 +154,21 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
     if (!property) return nil;
     self = [super init];
     _property = property;
-    const char *name = property_getName(property);
+    const char *name = property_getName(property); //获取属性名称
     if (name) {
         _name = [NSString stringWithUTF8String:name];
     }
-    
+    //获取属性的信息-类型，属性描述等
     YYEncodingType type = 0;
     unsigned int attrCount;
     objc_property_attribute_t *attrs = property_copyAttributeList(property, &attrCount);
     for (unsigned int i = 0; i < attrCount; i++) {
         switch (attrs[i].name[0]) {
-            case 'T': { // Type encoding
+            case 'T': { // Type encoding 类型
                 if (attrs[i].value) {
                     _typeEncoding = [NSString stringWithUTF8String:attrs[i].value];
                     type = YYEncodingGetType(attrs[i].value);
-                    
+                    //TODO: NSScanner
                     if ((type & YYEncodingTypeMask) == YYEncodingTypeObject && _typeEncoding.length) {
                         NSScanner *scanner = [NSScanner scannerWithString:_typeEncoding];
                         if (![scanner scanString:@"@\"" intoString:NULL]) continue;
@@ -198,31 +198,31 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
                     _ivarName = [NSString stringWithUTF8String:attrs[i].value];
                 }
             } break;
-            case 'R': {
+            case 'R': { //只读
                 type |= YYEncodingTypePropertyReadonly;
             } break;
-            case 'C': {
+            case 'C': { //copy
                 type |= YYEncodingTypePropertyCopy;
             } break;
-            case '&': {
+            case '&': { //retain
                 type |= YYEncodingTypePropertyRetain;
             } break;
-            case 'N': {
+            case 'N': { //nonatomic
                 type |= YYEncodingTypePropertyNonatomic;
             } break;
-            case 'D': {
+            case 'D': { 
                 type |= YYEncodingTypePropertyDynamic;
             } break;
-            case 'W': {
+            case 'W': {//weak
                 type |= YYEncodingTypePropertyWeak;
             } break;
-            case 'G': {
+            case 'G': {//geter
                 type |= YYEncodingTypePropertyCustomGetter;
                 if (attrs[i].value) {
                     _getter = NSSelectorFromString([NSString stringWithUTF8String:attrs[i].value]);
                 }
             } break;
-            case 'S': {
+            case 'S': {//setter
                 type |= YYEncodingTypePropertyCustomSetter;
                 if (attrs[i].value) {
                     _setter = NSSelectorFromString([NSString stringWithUTF8String:attrs[i].value]);
@@ -261,21 +261,24 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
     _superCls = class_getSuperclass(cls);
     _isMeta = class_isMetaClass(cls);
     if (!_isMeta) {
-        _metaCls = objc_getMetaClass(class_getName(cls));
+        _metaCls = objc_getMetaClass(class_getName(cls)); //获取元类
     }
-    _name = NSStringFromClass(cls);
+    _name = NSStringFromClass(cls); //获取类名
     [self _update];
 
-    _superClassInfo = [self.class classInfoWithClass:_superCls];
+    _superClassInfo = [self.class classInfoWithClass:_superCls]; //父类 类信息
     return self;
 }
 
 - (void)_update {
+    //都是NSDictionary
     _ivarInfos = nil;
     _methodInfos = nil;
     _propertyInfos = nil;
     
     Class cls = self.cls;
+    
+    //方法 class_copyMethodList
     unsigned int methodCount = 0;
     Method *methods = class_copyMethodList(cls, &methodCount);
     if (methods) {
@@ -287,6 +290,8 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
         }
         free(methods);
     }
+    
+    //属性 class_copyPropertyList
     unsigned int propertyCount = 0;
     objc_property_t *properties = class_copyPropertyList(cls, &propertyCount);
     if (properties) {
@@ -299,6 +304,7 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
         free(properties);
     }
     
+    //内部变量 class_copyIvarList
     unsigned int ivarCount = 0;
     Ivar *ivars = class_copyIvarList(cls, &ivarCount);
     if (ivars) {
@@ -328,23 +334,23 @@ YYEncodingType YYEncodingGetType(const char *typeEncoding) {
 
 + (instancetype)classInfoWithClass:(Class)cls {
     if (!cls) return nil;
-    static CFMutableDictionaryRef classCache;
-    static CFMutableDictionaryRef metaCache;
+    static CFMutableDictionaryRef classCache; // 类缓存
+    static CFMutableDictionaryRef metaCache;  // 元类缓存
     static dispatch_once_t onceToken;
     static dispatch_semaphore_t lock;
-    dispatch_once(&onceToken, ^{
+    dispatch_once(&onceToken, ^{ //TODO: => CFDictionaryCreateMutable
         classCache = CFDictionaryCreateMutable(CFAllocatorGetDefault(), 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
         metaCache = CFDictionaryCreateMutable(CFAllocatorGetDefault(), 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
         lock = dispatch_semaphore_create(1);
     });
-    dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
+    dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER); //又是😄信号量
     YYClassInfo *info = CFDictionaryGetValue(class_isMetaClass(cls) ? metaCache : classCache, (__bridge const void *)(cls));
     if (info && info->_needUpdate) {
         [info _update];
     }
     dispatch_semaphore_signal(lock);
     if (!info) {
-        info = [[YYClassInfo alloc] initWithClass:cls];
+        info = [[YYClassInfo alloc] initWithClass:cls]; // 生成对应的类信息对象
         if (info) {
             dispatch_semaphore_wait(lock, DISPATCH_TIME_FOREVER);
             CFDictionarySetValue(info.isMeta ? metaCache : classCache, (__bridge const void *)(cls), (__bridge const void *)(info));
